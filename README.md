@@ -4,7 +4,7 @@
 
 ## Mac 安装与使用
 
-1. 登录有权限的 GitHub 账号，在本私有仓库的 [Releases](https://github.com/Bronc-X/voice-capture-macos/releases) 下载 `Voice-Capture-1.0.0-macOS-arm64.dmg`。
+1. 在 [Releases](https://github.com/Bronc-X/voice-capture-macos/releases) 下载 `Voice-Capture-1.0.0-macOS-arm64.dmg`，无需登录 GitHub。
 2. 打开 DMG，把 **Voice Capture** 拖到 **Applications（应用程序）**，再从应用程序打开。
 3. 接好大疆麦克风，在“系统设置 → 声音 → 输入”中选中它；也可以用 Mac 内置麦克风。
 4. 勾选声音授权，点击“连接麦克风”，在 macOS 弹窗中允许访问麦克风。
