@@ -32,7 +32,11 @@ jobs:
       - run: npm ci --no-fund
       - run: npm test
       - name: Build DMG and ZIP
-        run: npm run dist:mac
+        run: |
+          if [ "$MAC_SIGNED" != "1" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          npm run dist:mac
         env:
           MAC_SIGNED: ${{ inputs.signed && '1' || '0' }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
