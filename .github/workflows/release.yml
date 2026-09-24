@@ -1,0 +1,79 @@
+name: Deliver verified macOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful macOS build run ID to deliver
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify source build
+        id: source
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > run.json
+          node <<'NODE'
+          const fs = require('fs');
+          const run = JSON.parse(fs.readFileSync('run.json', 'utf8'));
+          if (run.conclusion !== 'success' || run.path !== '.github/workflows/macos.yml' || run.head_branch !== 'main') {
+            throw new Error('Only a successful macOS build from main can be delivered.');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `sha=${run.head_sha}\nurl=${run.html_url}\n`);
+          NODE
+      - uses: actions/download-artifact@v4
+        with:
+          name: Voice-Capture-macOS-arm64
+          path: dist
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify checksums and create release
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          BUILD_URL: ${{ steps.source.outputs.url }}
+        run: |
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+          gh api "repos/$GH_REPO/contents/package.json?ref=$SOURCE_SHA" -H 'Accept: application/vnd.github.raw+json' > package.json
+          VERSION=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/${{ inputs.run_id }}/jobs" --jq '.jobs[].steps[] | select(.name == "Verify notarization for signed builds") | .conclusion' > signing-status.txt
+          if grep -qx success signing-status.txt; then
+            SIGNING='Developer ID 签名及 Apple 公证验证通过。'
+          else
+            SIGNING='ad-hoc 签名，未做 Apple Developer ID 签名和公证；首次打开可能需要在 macOS 隐私与安全性中放行。详情见仓库 README。'
+          fi
+          cat > release-notes.md <<EOF
+          适用于 Apple Silicon（M 系列芯片）、macOS 14+。
+
+          下载 DMG，把 Voice Capture 拖入“应用程序”，允许麦克风权限即可开始录音。内置运行环境，无需安装 Node、Python 或浏览器，无需联网。
+
+          支持录音、复听、单段 WAV 保存，以及 18 段以上合并导出为 48 kHz / 16-bit / mono WAV 和 JSON 清单。
+
+          **签名状态：** $SIGNING
+
+          **关闭前请导出：** 录音暂存在当前窗口内存中，不自动上传或保存。
+
+          **验证：** 在 Apple Silicon Mac 构建机上生成并挂载 DMG，复制应用后在空 PATH 下启动，三个端到端测试通过（模拟麦克风录音与播放、18 段导出、保存取消和失败恢复、权限拒绝恢复、关闭保护）。真实大疆设备与浏览器下载后的系统拦截体验仍需在目标 Mac 上验收。
+
+          源码提交：$SOURCE_SHA
+
+          [构建与测试记录]($BUILD_URL) · [安装说明](https://github.com/$GH_REPO#readme)
+
+          附件：DMG、ZIP 备用包和 SHA256SUMS.txt。发布前已重新核对文件校验值。
+          EOF
+          gh release create "v$VERSION" *.dmg *.zip SHA256SUMS.txt --target "$SOURCE_SHA" --title "声线采样室 v$VERSION · macOS Apple Silicon" --notes-file release-notes.md
