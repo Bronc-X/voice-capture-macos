@@ -1,0 +1,79 @@
+name: Build and verify Apple Silicon app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: Build with Developer ID and Apple notarization (requires repository secrets)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Confirm Apple Silicon runner
+        run: test "$(uname -m)" = arm64
+      - run: npm ci --no-fund
+      - run: npm test
+      - name: Build DMG and ZIP
+        run: npm run dist:mac
+        env:
+          MAC_SIGNED: ${{ inputs.signed && '1' || '0' }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Verify bundle, mount DMG, copy app like an installation
+        run: |
+          set -euo pipefail
+          APP="dist/mac-arm64/Voice Capture.app"
+          test "$(lipo -archs "$APP/Contents/MacOS/Voice Capture")" = arm64
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$APP/Contents/Info.plist"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          hdiutil verify dist/*.dmg
+          hdiutil attach dist/*.dmg -mountpoint "$RUNNER_TEMP/voice-dmg" -nobrowse -readonly
+          ditto "$RUNNER_TEMP/voice-dmg/Voice Capture.app" "$RUNNER_TEMP/installed/Voice Capture.app"
+          hdiutil detach "$RUNNER_TEMP/voice-dmg"
+          echo "VOICE_CAPTURE_EXECUTABLE=$RUNNER_TEMP/installed/Voice Capture.app/Contents/MacOS/Voice Capture" >> "$GITHUB_ENV"
+      - name: Test installed app (fake microphone, empty PATH)
+        run: npm run test:desktop
+      - name: Verify notarization for signed builds
+        if: ${{ inputs.signed }}
+        run: |
+          xcrun stapler validate "dist/mac-arm64/Voice Capture.app"
+          spctl --assess --type execute --verbose=2 "dist/mac-arm64/Voice Capture.app"
+      - name: Generate checksums
+        working-directory: dist
+        run: shasum -a 256 *.dmg *.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voice-Capture-macOS-arm64
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-test-results
+          path: test-results/
+          if-no-files-found: ignore

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta
+      name="description"
+      content="在本机采集用户本人授权的中文播客旁白声音样本，并导出 48 kHz 单声道 WAV 与质量清单。"
+    />
+    <title>声线采样室｜三期播客旁白</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="scripts.js" defer></script>
+    <script src="audio-utils.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="paper-grain" aria-hidden="true"></div>
+    <header class="masthead">
+      <a class="wordmark" href="#top" aria-label="回到页面顶部">
+        <span class="wordmark-cn">声线采样室</span>
+        <span class="wordmark-en">OWNER VOICE / FIELD SESSION 01</span>
+      </a>
+      <div class="privacy-seal">
+        <span class="privacy-dot" aria-hidden="true"></span>
+        仅在本机处理 · 不自动上传
+      </div>
+    </header>
+
+    <main id="top" class="studio-shell">
+      <aside class="session-rail" aria-label="采集进度">
+        <div class="reel-mark" aria-hidden="true">
+          <span>48K</span>
+          <span>MONO</span>
+          <span>PCM</span>
+        </div>
+
+        <div class="rail-progress">
+          <p class="eyebrow">SESSION PROGRESS</p>
+          <strong id="progressFraction">00 / 20</strong>
+          <div class="progress-track" aria-hidden="true">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <p id="recordedDuration" class="rail-caption">已收录 00:00</p>
+        </div>
+
+        <ol id="segmentRail" class="segment-rail-list" aria-label="采集段落列表"></ol>
+      </aside>
+
+      <section class="recording-desk" aria-labelledby="pageTitle">
+        <div class="hero-copy">
+          <p class="issue-line">2026.08.26 / VOICE OWNER CONSENTED / V1.2</p>
+          <h1 id="pageTitle">把声音留干净，<br />把表达留自然。</h1>
+          <p class="lede">
+            这是三期播客数字旁白的声音采集页。请使用你本人的声音，保持正常说话方式；我们先录一套 10–15
+            分钟的干声，再做 60–90 秒试音，确认后才批量合成。
+          </p>
+        </div>
+
+        <section class="consent-card" aria-labelledby="consentTitle">
+          <div>
+            <p class="eyebrow">01 / AUTHORIZATION</p>
+            <h2 id="consentTitle">先确认声音边界</h2>
+          </div>
+          <label class="consent-check">
+            <input id="consentCheckbox" type="checkbox" />
+            <span>
+              我确认正在录制的是我本人的声音，并授权它仅用于本项目三期播客的试音与旁白制作；不得用于仿冒参会者、冒充第三方或其他未授权用途。
+            </span>
+          </label>
+        </section>
+
+        <section class="setup-grid" aria-label="录音准备">
+          <article class="setup-note">
+            <span class="setup-number">A</span>
+            <h3>房间</h3>
+            <p>关窗，停掉风扇与提示音。软装比空房间更好；嘴离麦克风约一拳半。</p>
+          </article>
+          <article class="setup-note">
+            <span class="setup-number">B</span>
+            <h3>说话</h3>
+            <p>按平时播客语速读，不压嗓、不表演。错了就停，直接重录这一段。</p>
+          </article>
+          <article class="setup-note">
+            <span class="setup-number">C</span>
+            <h3>文件</h3>
+            <p>录音只在本机处理。关闭前请导出 WAV 和 JSON；当前窗口中的录音不会自动保存。</p>
+          </article>
+        </section>
+
+        <section class="recorder-panel" aria-labelledby="promptTitle">
+          <div class="recorder-topline">
+            <div>
+              <p class="eyebrow">02 / CAPTURE</p>
+              <h2 id="promptTitle">当前段落</h2>
+            </div>
+            <div id="micState" class="state-pill" data-state="idle">麦克风未连接</div>
+          </div>
+
+          <div class="take-board">
+            <div class="take-meta">
+              <span id="segmentId">S01</span>
+              <span id="segmentIntent">授权声明</span>
+              <span id="segmentEstimate">约 35 秒</span>
+            </div>
+            <p id="promptText" class="prompt-text"></p>
+            <p id="deliveryNote" class="delivery-note"></p>
+          </div>
+
+          <div class="meter-zone">
+            <div class="meter-heading">
+              <span>INPUT LEVEL</span>
+              <output id="liveDb">−∞ dBFS</output>
+            </div>
+            <div class="level-meter" aria-label="实时输入电平">
+              <div id="levelFill" class="level-fill"></div>
+              <i class="meter-safe-start" aria-hidden="true"></i>
+              <i class="meter-safe-end" aria-hidden="true"></i>
+            </div>
+            <p class="meter-hint">正常说话时，峰值尽量落在 −12 至 −3 dBFS 之间；碰到最右侧代表可能削波。</p>
+          </div>
+
+          <div class="transport" role="group" aria-label="录音控制">
+            <button id="connectMicBtn" class="button button-secondary" type="button">连接麦克风</button>
+            <button id="recordBtn" class="record-button" type="button" disabled>
+              <span class="record-icon" aria-hidden="true"></span>
+              <span id="recordBtnLabel">开始录这一段</span>
+            </button>
+            <button id="stopBtn" class="button button-dark" type="button" disabled>停止</button>
+          </div>
+
+          <p id="micHelp" class="quality-note" role="alert" hidden></p>
+          <div id="takeResult" class="take-result" hidden>
+            <div class="result-head">
+              <div>
+                <p class="eyebrow">TAKE REVIEW</p>
+                <h3>这条可以留下吗？</h3>
+              </div>
+              <span id="qualityBadge" class="quality-badge">待检查</span>
+            </div>
+            <audio id="takePreview" controls></audio>
+            <dl class="metrics-grid">
+              <div><dt>时长</dt><dd id="metricDuration">—</dd></div>
+              <div><dt>峰值</dt><dd id="metricPeak">—</dd></div>
+              <div><dt>平均响度</dt><dd id="metricRms">—</dd></div>
+              <div><dt>削波</dt><dd id="metricClipping">—</dd></div>
+            </dl>
+            <p id="qualityNote" class="quality-note"></p>
+            <div class="review-actions">
+              <button id="retakeBtn" class="button button-secondary" type="button">重录这段</button>
+              <button id="acceptBtn" class="button button-accent" type="button">收下并继续</button>
+              <button id="downloadTakeBtn" class="button button-text" type="button">下载本段 WAV</button>
+            </div>
+          </div>
+
+          <nav class="prompt-nav" aria-label="段落切换">
+            <button id="prevBtn" class="nav-arrow" type="button" aria-label="上一段">←</button>
+            <span id="navStatus">第 1 段，共 20 段</span>
+            <button id="nextBtn" class="nav-arrow" type="button" aria-label="下一段">→</button>
+          </nav>
+        </section>
+
+        <section class="export-panel" aria-labelledby="exportTitle">
+          <div>
+            <p class="eyebrow">03 / HANDOFF</p>
+            <h2 id="exportTitle">导出给数字声线试音</h2>
+            <p>
+              至少录完 18 段再导出。合并 WAV 会在段落之间自动插入 0.75 秒静音；JSON 记录每段时间、质量指标和文本，方便后续切分与回查。
+            </p>
+          </div>
+          <div class="export-actions">
+            <button id="exportAudioBtn" class="button button-accent" type="button" disabled>导出合并 WAV</button>
+            <button id="exportManifestBtn" class="button button-dark" type="button" disabled>导出质量清单 JSON</button>
+          </div>
+          <p id="exportStatus" class="export-status" aria-live="polite">尚未达到导出条件。</p>
+        </section>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <span>OWNER VOICE ONLY</span>
+      <span>NO PARTICIPANT CLONING</span>
+      <span>SYNTHETIC NARRATION WILL BE LABELED</span>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

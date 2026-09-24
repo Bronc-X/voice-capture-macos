@@ -1,0 +1,25 @@
+# This folder also holds private production material. Only app source belongs in Git.
+/recordings/
+/podcast-assets/
+/recording-podcast-benchmark/
+/ai-engineering-skills-map-30d/
+/tools/
+/*.zip
+/*.sha256.txt
+/_tmp*
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.p12
+*.p8
+*.mobileprovision
+.env
+.env.*
+node_modules/
+dist/
+test-results/
+playwright-report/
+__pycache__/
+.DS_Store
+*.log
